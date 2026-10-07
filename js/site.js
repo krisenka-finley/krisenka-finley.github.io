@@ -418,7 +418,7 @@
   autoBtn.addEventListener("click", () => setAuto(!auto.on));
   let userStopped = false;       // si lo para con el botón, no se reanuda solo
   let idle = null;
-  ["wheel", "touchstart", "keydown"].forEach((ev) => window.addEventListener(ev, (e) => {
+  ["wheel", "touchstart", "pointerdown", "keydown"].forEach((ev) => window.addEventListener(ev, (e) => {
     if (e.target.closest && e.target.closest("#auto, #gate")) return;
     if (!document.body.classList.contains("entered")) return;
     if (auto.on || autoStart) setAuto(false);
@@ -428,7 +428,8 @@
   }, { passive: true }));
   autoBtn.addEventListener("click", () => { userStopped = !auto.on; clearTimeout(idle); });
   // al entrar arranca el viaje enseguida
-  document.addEventListener("kf:entered", () => { if (!reduce) autoStart = setTimeout(() => setAuto(true), 1200); });
+  // (en vertical, después del paseo por la ilustración: cantante → río → cantante)
+  document.addEventListener("kf:entered", () => { if (!reduce) autoStart = setTimeout(() => setAuto(true), KF.vw < KF.vh ? 4600 : 1200); });
 
   const ease = (u) => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2);
   let lt = performance.now();
@@ -437,8 +438,12 @@
     lt = now;
     if (auto.on && !$("#case").open) {
       const vh = KF.vh, max = KF.docH - vh;
-      if (Math.abs(window.scrollY - auto.last) > 3) setAuto(false);
+      // si la página se ha movido mucho por su cuenta (barra de desplazamiento, un enlace), se para;
+      // un desajuste pequeño (en el móvil, la barra del navegador que aparece o se esconde) no
+      const drift = Math.abs(window.scrollY - auto.last);
+      if (drift > Math.max(60, vh * 0.2)) setAuto(false);
       else {
+        if (drift > 3) auto.pos = window.scrollY;
         if (auto.mode === "down") {
           // más despacio mientras un disco está quieto, para poder leerlo
           auto.pos += (vh / (holding ? 9 : 3.2)) * dt;

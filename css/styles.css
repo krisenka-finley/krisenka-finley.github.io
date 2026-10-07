@@ -136,7 +136,7 @@ main, .footer { position: relative; z-index: 1; }
     width: min(92vw, 560px); height: auto; translate: -50% 0; cursor: pointer;
     transform-origin: 50% 60%; animation: breathe-soft 7s ease-in-out infinite;
   }
-  .hero__pan-hint { top: auto; bottom: calc(6.6rem + env(safe-area-inset-bottom, 0px)); }
+  .hero .hero__pan-hint { top: auto; bottom: calc(6.6rem + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* el menú de nubes aparece al entrar */
