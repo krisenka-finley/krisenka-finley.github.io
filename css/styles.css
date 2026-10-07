@@ -382,7 +382,7 @@ body.entered .hero.can-pan .hero__pan-hint { display: block; }
   animation: sunrays 70s linear infinite;
   pointer-events: none;
 }
-.footer__sign img { position: relative; width: 100%; height: auto; animation: float 5s ease-in-out infinite; filter: drop-shadow(0 0 2px var(--plum)) drop-shadow(5px 6px 0 rgba(138, 75, 255, .8)); }
+.footer__sign img { position: relative; width: 100%; height: auto; animation: float 5s ease-in-out infinite; }
 @keyframes sunrays { to { transform: translate(-50%, -50%) rotate(360deg); } }
 .footer p { margin: .2rem 0; }
 
