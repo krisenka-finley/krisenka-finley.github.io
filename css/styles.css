@@ -267,21 +267,25 @@ body.entered .hero.can-pan .hero__pan-hint { display: block; }
 /* vinilos: salen del centro del túnel girando y se colocan en su sitio */
 .vinyls { grid-column: 1 / -1; list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: clamp(.8rem, 2.4vw, 2rem); }
 .vinyls li { flex: 0 0 clamp(84px, min(15vw, calc(88vw / var(--n, 5)), 18vh), 170px); transform-origin: 50% 40%; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: .2rem; will-change: transform, opacity; }
-.vinyl {
-  position: relative; display: block; width: 100%; max-width: 170px; aspect-ratio: 1; padding: 0; border: 0; border-radius: 50%; background: none;
-  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, .55)) drop-shadow(0 0 12px rgba(255, 79, 163, .5));
-  transition: filter .3s;
+.vinyl { position: relative; display: block; width: 100%; max-width: 170px; aspect-ratio: 1; padding: 0; border: 0; border-radius: 50%; background: none; }
+/* la sombra va en una capa que no gira: con un filtro en el botón, el
+   navegador repintaba las sombras de todos los vinilos en cada fotograma */
+.vinyl::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  box-shadow: 0 10px 14px rgba(0, 0, 0, .55), 0 0 12px rgba(255, 79, 163, .5);
+  transition: box-shadow .3s;
 }
 .vinyl__disc {
   position: absolute; inset: 0; border-radius: 50%;
   background: repeating-radial-gradient(circle, #1a1020 0 1.2px, #2a1d33 1.2px 2.4px, #120a17 2.4px 3.2px);
   box-shadow: inset 0 0 0 2px #0b060e, inset 0 0 0 5px #24162c, 0 0 0 3px var(--plum);
-  animation: rot 3.6s linear infinite; animation-delay: var(--d);
+  animation: rot 3.6s linear infinite; animation-delay: var(--d); will-change: transform;
 }
 .vinyl__label { position: absolute; inset: 31%; border-radius: 50%; background-size: cover; background-position: center; box-shadow: 0 0 0 3px var(--yellow), 0 0 0 5px var(--plum); }
 .vinyl__label::after { content: ""; position: absolute; left: 50%; top: 50%; width: 10%; height: 10%; margin: -5% 0 0 -5%; border-radius: 50%; background: var(--night); }
 .vinyl__sheen { position: absolute; inset: 0; border-radius: 50%; pointer-events: none; background: conic-gradient(from 30deg, transparent 0 9%, rgba(255, 220, 255, .2) 13%, transparent 18% 50%, rgba(160, 230, 255, .14) 55%, transparent 61%); mix-blend-mode: screen; }
-.vinyl:hover, .vinyl:focus-visible { filter: drop-shadow(0 16px 22px rgba(0, 0, 0, .55)) drop-shadow(0 0 26px rgba(255, 210, 63, .85)); outline: none; }
+.vinyl:hover, .vinyl:focus-visible { outline: none; }
+.vinyl:hover::before, .vinyl:focus-visible::before { box-shadow: 0 16px 22px rgba(0, 0, 0, .55), 0 0 26px rgba(255, 210, 63, .85); }
 .vinyl:hover .vinyl__disc, .vinyl:focus-visible .vinyl__disc { animation-duration: 1.1s; }
 .vinyl__name { margin-top: .5rem; font: 900 1.15rem/1.1 var(--display); font-variation-settings: "SOFT" 100, "WONK" 1; text-align: center; }
 .vinyl__kind { font-size: .8rem; color: var(--lilac); }

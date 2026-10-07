@@ -1,8 +1,9 @@
 /* ==========================================================
    El concierto (de noche): túnel de neón en 3D con Three.js.
    La cámara avanza con el scroll; los anillos giran y respiran solos
-   y el ecualizador sigue a la música. Three.js se descarga solo cuando
-   el visitante empieza a bajar, para que la portada cargue antes.
+   y el ecualizador sigue a la música. Three.js se descarga cuando la
+   portada ya ha cargado, mientras se ve la entrada (la página está quieta),
+   y se deja todo preparado para que el túnel no dé un tirón al aparecer.
    ========================================================== */
 (function () {
   "use strict";
@@ -25,8 +26,10 @@
   }
   const onScroll = () => { if (window.scrollY > KF.heroH * 0.1) boot(); };
   window.addEventListener("scroll", onScroll, { passive: true });
-  // al entrar, se descarga con calma mientras se ve la portada
-  document.addEventListener("kf:entered", () => setTimeout(boot, 2500));
+  // con la portada ya cargada, se descarga en un momento libre del navegador
+  const whenIdle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 2000 }) : setTimeout(fn, 600));
+  if (document.readyState === "complete") whenIdle(boot);
+  else window.addEventListener("load", () => whenIdle(boot));
 
   function start() {
   if (!window.THREE) { canvas.remove(); return; }
@@ -129,7 +132,7 @@
   const clock = new THREE.Clock();
   const Z0 = 8, ZL = 120;
 
-  let last = performance.now(), frames = 0, slow = 0, lastFade = "";
+  let last = performance.now(), frames = 0, slow = 0, win = 0, lastFade = "";
   function frame(now) {
     requestAnimationFrame(frame);
     const raw = (now - last) / 1000;
@@ -140,12 +143,14 @@
     if (fo !== lastFade) { lastFade = fo; canvas.style.opacity = fo; }
     visible = fade > 0.01;
     if (!visible || document.hidden) return;
-    // calidad adaptable, igual que en la portada
-    frames++;
-    if (raw > 0.021) slow++;
-    if (frames >= 60) {
-      if (slow > 20 && quality > 0.45) { quality *= 0.75; R.setPixelRatio(quality); resize(); }
-      frames = 0; slow = 0;
+    // calidad adaptable, igual que en la portada: se mira cada segundo
+    if (raw < 1) {
+      win += raw; frames++;
+      if (raw > 0.021) slow++;
+      if (win >= 1) {
+        if (slow * 3 > frames && quality > 0.45) { quality *= 0.75; R.setPixelRatio(quality); resize(); }
+        win = 0; frames = 0; slow = 0;
+      }
     }
 
     const t = reduce ? 0 : clock.getElapsedTime();
@@ -185,6 +190,10 @@
     });
     R.render(scene, cam);
   }
+  // se compilan los shaders y se suben geometrías y texturas con el lienzo aún
+  // invisible: si no, el primer fotograma del túnel congela la página a mitad de la bajada
+  R.compile(scene, cam);
+  R.render(scene, cam);
   requestAnimationFrame(frame);
   }
 })();
