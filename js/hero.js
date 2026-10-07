@@ -41,7 +41,8 @@
     // en pantallas verticales, la vista de partida es la cantante (justo debajo del nombre)
     state.home = vw < vh ? Math.min(state.maxPan, (1000 - 470) * state.scale) : 0;
     if (!state.userPanned) state.pan = state.home;
-    state.offY = (vh - h) * 0.35;
+    // si sobra ilustración en vertical, se recorta por abajo: arriba están las nubes del menú y el sol
+    state.offY = Math.max(vh - h, -8 * state.scale);
     hero.classList.toggle("can-pan", state.maxPan > 40);
     applyPan();
     resizeCanvases(w, h);
