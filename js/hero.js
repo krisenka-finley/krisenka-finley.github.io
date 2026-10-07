@@ -17,10 +17,11 @@
   const dusk = document.getElementById("dusk");
   const beat = window.KFBeat;
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const meter = KF.meter();
 
   const state = {
     t: 0, last: performance.now(), running: true, visible: true,
-    mouse: [-9999, -9999], night: 0, quality: 1, slow: 0, frames: 0, win: 0, dim: false, wind: 0, windTarget: 0, titleBoost: 0, titleHover: false,
+    mouse: [-9999, -9999], night: 0, quality: 1, good: 0, bad: 0, dim: false, wind: 0, windTarget: 0, titleBoost: 0, titleHover: false,
     sunAngle: 0, sunVel: 0, ripples: [], pan: 0, maxPan: 0, scale: 1
   };
 
@@ -241,8 +242,8 @@
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     // resolución WebGL limitada para que vaya fluido en cualquier equipo
     const budget = window.innerWidth < 700 ? 0.55e6 : 1.1e6;
-    // al anochecer el túnel 3D ya se ve detrás: la portada, oscurecida, va a media resolución
-    const glScale = Math.min(dpr, 1.25, Math.sqrt(budget / (w * h))) * state.quality * (state.dim ? 0.5 : 1);
+    // al anochecer el túnel 3D ya se ve detrás: la portada, oscurecida, baja de resolución
+    const glScale = Math.min(dpr, 1.25, Math.sqrt(budget / (w * h))) * state.quality * (state.dim ? 0.65 : 1);
     glCanvas.width = Math.round(w * glScale);
     glCanvas.height = Math.round(h * glScale);
     if (gl) gl.viewport(0, 0, glCanvas.width, glCanvas.height);
@@ -553,18 +554,25 @@
       // cuando ya es de noche (la portada está casi tapada) no se dibuja: así
       // la portada y el túnel 3D no compiten por la tarjeta gráfica
       if (state.night < 0.97) {
-        // calidad adaptable: se mira cada segundo (no cada 60 fotogramas, que en
-        // un equipo lento tardaría mucho); si un tercio de los fotogramas pasa de
-        // ~40 fps, se baja la resolución (un parón suelto no basta).
-        if (raw < 1) {
-          state.win += raw; state.frames++;
-          if (raw > 0.021) state.slow++;
-          if (state.win >= 1) {
-            if (state.slow * 3 > state.frames && state.quality > 0.45) {
-              state.quality *= 0.75;
+        // calidad adaptable: se mira cada segundo y solo con la portada a solas (al
+        // anochecer también se dibuja el túnel y la lentitud no sería suya). Si un
+        // tercio de los fotogramas pasa de ~40 fps, se baja un escalón; si va
+        // holgada unos segundos, se recupera. Nunca baja tanto que se vea pixelada:
+        // si ni así llega, se apaga el WebGL y queda la ilustración nítida con la capa 2D.
+        const slowShare = gl && !state.dim ? meter(raw) : null;
+        if (slowShare != null) {
+          {
+            if (slowShare > 1 / 3 && state.quality > 0.7) {
+              state.quality *= 0.8; state.good = 0;
               resizeCanvases(parseFloat(stage.style.width), parseFloat(stage.style.height));
-            }
-            state.win = 0; state.frames = 0; state.slow = 0;
+            } else if (slowShare > 1 / 3 && ++state.bad >= 3) {
+              stage.classList.remove("gl-ready");
+              gl = null;
+            } else if (slowShare < 0.1 && state.quality < 1 && ++state.good >= 4) {
+              state.quality = Math.min(1, state.quality / 0.8); state.good = 0;
+              resizeCanvases(parseFloat(stage.style.width), parseFloat(stage.style.height));
+            } else if (slowShare >= 0.1) state.good = 0;
+            if (slowShare <= 1 / 3) state.bad = 0;
           }
         }
         drawGL();
