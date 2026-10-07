@@ -4,7 +4,7 @@ Web de una sola página: **de día** se pasea por la ilustración animada de Zar
 
 ## Qué hay
 - **Entrada** sobre la propia ilustración: solo sus animaciones y dos nubes, «Entrar con sonido» y «Entrar sin sonido» (los navegadores solo dejan sonar música tras un clic). Al entrar aparecen las nubes del menú y las zonas interactivas.
-- **Portada de día** (WebGL): el río fluye hacia el puente, las flores se mecen con el viento, las nubes se mueven, el sol proyecta rayos, el rótulo FINLEY cambia de color y el siluro salta y se sumerge . Las nubes del menú son botones, la guitarra suena y el sol gira.
+- **Portada de día**, por capas: el fondo (WebGL: el río fluye hacia el puente, las nubes respiran y el sol proyecta rayos) y encima la cantante, que se balancea; el nombre, que respira y se aviva al pasar por encima; los ramos de flores, que se mecen y se inclinan con las ráfagas de viento; y el siluro, que salta y se sumerge. Las nubes del menú son botones, la guitarra suena y el sol gira. En pantallas verticales el nombre va aparte, arriba, para que se lea entero.
 - **Atardecer**: al bajar, la ilustración se oscurece y aparece el túnel de neón 3D (Three.js) que avanza con el scroll.
 - **Viaje por el túnel**: cada sección es un disco que sale del fondo girando, se para para leerlo y sale volando. Los vinilos de Música salen uno a uno del centro.
 - **Música**: reproductor de «Back Again» con ecualizador real, vinilos que giran y, al pulsar uno, su **caja de CD se abre** y muestra el disco.
@@ -31,10 +31,11 @@ python3 -m http.server 8000
 # abrir http://localhost:8000
 ```
 
-## Regenerar recursos de la ilustración
-```
-python3 tools/build_fish.py tools/krisenka-original.jpg assets
-python3 tools/build_menu.py tools/krisenka-original.jpg assets
-python3 tools/build_masks.py assets
-python3 tools/build_title.py tools/krisenka-original.jpg assets
-```
+## Imágenes de la portada
+Cada pieza es un archivo de `assets/` y su posición está en `index.html` (`data-rect="x,y,ancho,alto"`, en píxeles de la ilustración de 2000×1116):
+
+- `portada-fondo.webp`: el paisaje sin personajes (es lo que anima el WebGL). `fx-mask.png` marca en verde el río y en azul las nubes que se mueven.
+- `portada-cantante.webp`, `nombre-krisenka-finley.webp` y `portada-flor-*.webp`: con fondo transparente.
+- `siluro.webp`: el pez, girado como sale del agua (su centro está en `PIVOT`, en `js/hero.js`).
+
+Para recortar un dibujo nuevo de su fondo de papel: `python3 tools/recortar.py dibujo.jpg recorte.png`.

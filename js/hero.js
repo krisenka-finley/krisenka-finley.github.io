@@ -1,5 +1,6 @@
 /* ==========================================================
-   Portada animada: WebGL (río, flores, nubes, rayos de sol)
+   Portada animada: WebGL sobre el fondo (río, nubes, rayos de sol)
+   + capas encima (cantante, nombre y flores, animadas con CSS)
    + capa 2D (siluro saltando, salpicaduras, notas, pájaros…)
    Todas las coordenadas están en píxeles de la ilustración 2000×1116.
    ========================================================== */
@@ -15,13 +16,14 @@
   const ctx2d = canvas2d.getContext("2d");
   const panHint = document.getElementById("pan-hint");
   const dusk = document.getElementById("dusk");
+  const cantante = document.getElementById("cantante");
   const beat = window.KFBeat;
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const meter = KF.meter();
 
   const state = {
     t: 0, last: performance.now(), running: true, visible: true,
-    mouse: [-9999, -9999], night: 0, quality: 1, good: 0, bad: 0, dim: false, wind: 0, windTarget: 0, titleBoost: 0, titleHover: false,
+    mouse: [-9999, -9999], night: 0, quality: 1, good: 0, bad: 0, dim: false,
     sunAngle: 0, sunVel: 0, ripples: [], pan: 0, maxPan: 0, scale: 1
   };
 
@@ -73,8 +75,8 @@
   const FRAG = `
     precision highp float;
     varying vec2 vUv;
-    uniform sampler2D uImg, uMask, uMask2;
-    uniform float uTime, uWind, uTitle, uSun, uNight;
+    uniform sampler2D uImg, uMask;
+    uniform float uTime, uSun, uNight;
     uniform vec2 uMouse;
     uniform vec4 uRip[4];
     const vec2 SZ = vec2(2000.0, 1116.0);
@@ -85,22 +87,11 @@
       return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
     }
     vec2 rot(vec2 v, float a){ float c = cos(a), s = sin(a); return vec2(c * v.x - s * v.y, s * v.x + c * v.y); }
-    vec3 hueShift(vec3 c, float a){
-      const vec3 k = vec3(0.57735); float ca = cos(a);
-      return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
-    }
 
     void main(){
       vec2 P = vUv * SZ; float t = uTime;
       vec3 m = texture2D(uMask, vUv).rgb;
-      vec3 m2 = texture2D(uMask2, vUv).rgb;
       vec2 off = vec2(0.0);
-
-      // Flores mecidas por el viento (ráfagas que cruzan de izquierda a derecha)
-      float ph = m2.r * 6.2831;
-      float gust = 0.65 + 0.35 * sin(t * 0.37 - P.x * 0.002) + uWind * 1.6;
-      off.x += m.r * (7.0 * sin(t * 1.4 + ph) + 2.5 * sin(t * 3.1 + ph * 2.0 + P.y * 0.02)) * gust - m.r * uWind * 6.0;
-      off.y += m.r * 1.4 * sin(t * 1.4 + ph + 1.57);
 
       // Nubes que respiran
       off.x += m.b * (3.0 * sin(t * 0.45 + P.y * 0.045) + 3.0 * sin(t * 0.21 + P.x * 0.006));
@@ -148,11 +139,6 @@
       // Destellos en el agua
       float spark = pow(noise(q2 * vec2(1.0, 1.6) + 11.0), 9.0) * nearW * 1.4 + pow(noise(qf * 1.7 + 3.0), 7.0) * farW;
       col += vec3(0.95, 0.97, 1.0) * spark * 0.35 + vec3(0.8, 0.92, 1.0) * ripLight * 0.25;
-
-      // Letras FINLEY: arcoíris que recorre el rótulo
-      float mx = max(col.r, max(col.g, col.b)), mn = min(col.r, min(col.g, col.b));
-      float k = m2.g * smoothstep(0.25, 0.45, mx - mn) * smoothstep(0.45, 0.6, mx);
-      col = mix(col, clamp(hueShift(col, t * (0.9 + uTitle * 3.0) + P.x * 0.012), 0.0, 1.0), k);
 
       // Atardecer: al bajar hacia el concierto la escena se vuelve noche
       col = mix(col, col * vec3(0.50, 0.32, 0.72) + vec3(0.06, 0.02, 0.10), uNight * 0.8);
@@ -208,18 +194,16 @@
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 
-    ["uImg", "uMask", "uMask2", "uTime", "uWind", "uTitle", "uSun", "uMouse", "uRip", "uNight"].forEach((n) => {
+    ["uImg", "uMask", "uTime", "uSun", "uMouse", "uRip", "uNight"].forEach((n) => {
       uni[n] = gl.getUniformLocation(prog, n);
     });
 
     const plateReady = plate.complete && plate.naturalWidth ? Promise.resolve(plate) : loadImage(plate.src);
-    return Promise.all([plateReady, loadImage("assets/fx-mask.png"), loadImage("assets/fx-mask2.png")]).then(([img, m1, m2]) => {
+    return Promise.all([plateReady, loadImage("assets/fx-mask.png")]).then(([img, m1]) => {
       texture(img, 0, false);
       texture(m1, 1, true);
-      texture(m2, 2, true);
       gl.uniform1i(uni.uImg, 0);
       gl.uniform1i(uni.uMask, 1);
-      gl.uniform1i(uni.uMask2, 2);
       resizeCanvases(parseFloat(stage.style.width), parseFloat(stage.style.height));
       drawGL();
       stage.classList.add("gl-ready");
@@ -261,8 +245,6 @@
   function drawGL() {
     if (!gl) return;
     gl.uniform1f(uni.uTime, state.t);
-    gl.uniform1f(uni.uWind, state.wind);
-    gl.uniform1f(uni.uTitle, state.titleBoost);
     gl.uniform1f(uni.uSun, state.sunAngle);
     gl.uniform1f(uni.uNight, state.night);
     gl.uniform2f(uni.uMouse, state.mouse[0], state.mouse[1]);
@@ -277,8 +259,7 @@
      ====================================================== */
   const fishImg = new Image();
   fishImg.src = "assets/siluro.webp";
-  const FISH_BOX = [988, 814];          // posición original del recorte
-  const PIVOT = [172, 126];             // centro del cuerpo dentro del recorte
+  const PIVOT = [165, 145];             // centro del cuerpo dentro de la imagen del siluro
   const WATER_Y = 1060;                 // línea del agua donde entra/sale
   const S0 = 0.22;                      // momento del salto que coincide con la ilustración
   const HEIGHT = 120 / (4 * S0 * (1 - S0));
@@ -407,9 +388,10 @@
   }
 
   function gust() {
-    state.windTarget = 1;
-    setTimeout(() => (state.windTarget = 0), 2200);
-    const sources = [[275, 262], [372, 303], [565, 388], [1920, 630], [1724, 790], [1784, 655], [1958, 796], [140, 590]];
+    // las flores se inclinan con la ráfaga y sueltan pétalos
+    stage.classList.add("is-gust");
+    setTimeout(() => stage.classList.remove("is-gust"), 2200);
+    const sources = [[1760, 560], [1900, 620], [1840, 740], [1790, 790], [1930, 880], [90, 560], [160, 650], [120, 880], [330, 960]];
     for (let i = 0; i < 16; i++) {
       const [sx, sy] = pick(sources);
       petals.push({ x: sx + (Math.random() - 0.5) * 60, y: sy + (Math.random() - 0.5) * 60, vx: 140 + Math.random() * 160, vy: -30 + Math.random() * 40, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 6, col: pick(PALETTE), life: 0 });
@@ -426,7 +408,7 @@
     for (let i = rings.length - 1; i >= 0; i--) if (rings[i].age > 2.2) rings.splice(i, 1);
 
     noteTimer -= dt;
-    if (noteTimer <= 0) { emitNotes(500, 585, 1, false); noteTimer = (beat && beat.playing ? 0.45 : 1.1) + Math.random() * 0.6; }
+    if (noteTimer <= 0) { emitNotes(480, 545, 1, false); noteTimer = (beat && beat.playing ? 0.45 : 1.1) + Math.random() * 0.6; }
     notes.forEach((n) => { n.life += dt; n.x += n.vx * dt + Math.sin(n.life * 3 + n.w) * 0.6; n.y += n.vy * dt; n.vy *= 0.995; });
     for (let i = notes.length - 1; i >= 0; i--) if (notes[i].life > notes[i].max) notes.splice(i, 1);
 
@@ -539,12 +521,10 @@
     state.last = now;
     if (state.running && state.visible) {
       state.t += dt;
-      state.wind += (state.windTarget - state.wind) * Math.min(1, dt * 1.6);
       const night = Math.min(1, Math.max(0, KF.y() / Math.max(1, KF.heroH) * 1.4));
       if (night !== state.night) { state.night = night; dusk.style.opacity = night.toFixed(3); }
       const dim = state.dim ? night > 0.36 : night > 0.42;
       if (dim !== state.dim) { state.dim = dim; resizeCanvases(parseFloat(stage.style.width), parseFloat(stage.style.height)); }
-      state.titleBoost += ((state.titleHover ? 1 : 0) - state.titleBoost) * Math.min(1, dt * 3);
       state.sunVel *= Math.pow(0.35, dt);
       state.sunAngle += state.sunVel * dt;
       if (Math.abs(state.sunVel) < 0.6) {
@@ -558,22 +538,25 @@
         // anochecer también se dibuja el túnel y la lentitud no sería suya). Si un
         // tercio de los fotogramas pasa de ~40 fps, se baja un escalón; si va
         // holgada unos segundos, se recupera. Nunca baja tanto que se vea pixelada:
-        // si ni así llega, se apaga el WebGL y queda la ilustración nítida con la capa 2D.
-        const slowShare = gl && !state.dim ? meter(raw) : null;
-        if (slowShare != null) {
-          {
-            if (slowShare > 1 / 3 && state.quality > 0.7) {
-              state.quality *= 0.8; state.good = 0;
-              resizeCanvases(parseFloat(stage.style.width), parseFloat(stage.style.height));
-            } else if (slowShare > 1 / 3 && ++state.bad >= 3) {
-              stage.classList.remove("gl-ready");
-              gl = null;
-            } else if (slowShare < 0.1 && state.quality < 1 && ++state.good >= 4) {
-              state.quality = Math.min(1, state.quality / 0.8); state.good = 0;
-              resizeCanvases(parseFloat(stage.style.width), parseFloat(stage.style.height));
-            } else if (slowShare >= 0.1) state.good = 0;
-            if (slowShare <= 1 / 3) state.bad = 0;
-          }
+        // si ni así llega, se apaga el WebGL y queda la ilustración nítida con la capa 2D
+        // (y si aun así va justa, se paran las capas animadas).
+        const slowShare = !state.dim ? meter(raw) : null;
+        if (slowShare != null && gl) {
+          if (slowShare > 1 / 3 && state.quality > 0.7) {
+            state.quality *= 0.8; state.good = 0;
+            resizeCanvases(parseFloat(stage.style.width), parseFloat(stage.style.height));
+          } else if (slowShare > 1 / 3 && ++state.bad >= 3) {
+            stage.classList.remove("gl-ready");
+            gl = null; state.bad = 0;
+          } else if (slowShare < 0.1 && state.quality < 1 && ++state.good >= 4) {
+            state.quality = Math.min(1, state.quality / 0.8); state.good = 0;
+            resizeCanvases(parseFloat(stage.style.width), parseFloat(stage.style.height));
+          } else if (slowShare >= 0.1) state.good = 0;
+          if (slowShare <= 1 / 3) state.bad = 0;
+        } else if (slowShare != null) {
+          // ya sin WebGL y aún justa: las capas (cantante, nombre, flores) se quedan quietas
+          if (slowShare > 1 / 3 && ++state.bad >= 3) stage.classList.add("is-lite");
+          else if (slowShare <= 1 / 3) state.bad = 0;
         }
         drawGL();
         update2D(dt);
@@ -607,8 +590,10 @@
     if (suppressClick) return;
     const chord = CHORD_CYCLE[chordIdx++ % CHORD_CYCLE.length];
     if (window.KFAudio) KFAudio.strum(chord);
-    emitNotes(360, 880, 7, true);
+    emitNotes(365, 900, 7, true);
     pulse(e.currentTarget);
+    cantante.classList.add("strum");
+    setTimeout(() => cantante.classList.remove("strum"), 140);
   });
 
   stage.querySelector(".hot--sun").addEventListener("click", (e) => {
@@ -620,8 +605,9 @@
   });
 
   const titleBtn = stage.querySelector(".hot--title");
-  titleBtn.addEventListener("pointerenter", () => (state.titleHover = true));
-  titleBtn.addEventListener("pointerleave", () => (state.titleHover = false));
+  titleBtn.addEventListener("pointerenter", () => stage.classList.add("title-hover"));
+  titleBtn.addEventListener("pointerleave", () => stage.classList.remove("title-hover"));
+  document.getElementById("nombre-movil").addEventListener("click", () => { if (document.body.classList.contains("entered")) titleBtn.click(); });
   titleBtn.addEventListener("click", () => {
     if (suppressClick) return;
     burstSparks(1000, 560, 40);
@@ -643,14 +629,14 @@
     const [x, y] = toImage(e);
     if (fishHit(x, y)) { burstSparks(x, y, 16); if (window.KFAudio) KFAudio.bloop(); return; }
     if (fish.phase === "under" && Math.abs(x - START_X) < 260 && y > 950) { jumpNow(); return; }
-    if (y > 830 && x > 700 && x < 1660) { addRipple(x, y, 0.8); if (window.KFAudio) KFAudio.splash(false); }
+    if (y > 830 && x > 680 && x < 1660) { addRipple(x, y, 0.8); if (window.KFAudio) KFAudio.splash(false); }
   });
 
   let lastSpark = 0;
   hero.addEventListener("pointermove", (e) => {
     const [x, y] = toImage(e);
     state.mouse = [x, y];
-    stage.style.cursor = fishHit(x, y) || (y > 830 && x > 700 && x < 1660) ? "pointer" : "";
+    stage.style.cursor = fishHit(x, y) || (y > 830 && x > 680 && x < 1660) ? "pointer" : "";
     if (e.pointerType === "mouse" && performance.now() - lastSpark > 35) {
       lastSpark = performance.now();
       sparks.push({ x, y, vx: (Math.random() - 0.5) * 30, vy: 20 + Math.random() * 30, life: 0, max: 0.8, r: 6 + Math.random() * 7, col: pick(PALETTE) });
