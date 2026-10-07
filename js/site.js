@@ -428,8 +428,8 @@
   }, { passive: true }));
   autoBtn.addEventListener("click", () => { userStopped = !auto.on; clearTimeout(idle); });
   // al entrar arranca el viaje enseguida
-  // (en vertical, después del paseo por la ilustración: cantante → río → cantante)
-  document.addEventListener("kf:entered", () => { if (!reduce) autoStart = setTimeout(() => setAuto(true), KF.vw < KF.vh ? 4600 : 1200); });
+  // (en vertical, con un momento más para ver la portada)
+  document.addEventListener("kf:entered", () => { if (!reduce) autoStart = setTimeout(() => setAuto(true), KF.vw < KF.vh ? 2600 : 1200); });
 
   const ease = (u) => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2);
   let lt = performance.now();
