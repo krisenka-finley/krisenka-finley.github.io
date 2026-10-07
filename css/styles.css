@@ -205,7 +205,10 @@ body.entered .hero.can-pan .hero__pan-hint { display: block; }
   -webkit-mask: radial-gradient(circle, #000 30%, transparent 68%); mask: radial-gradient(circle, #000 30%, transparent 68%);
   opacity: .6;
   animation: rot 60s linear infinite;
+  transition: opacity .3s;
 }
+/* al salir volando, los rayos (una capa enorme con máscara) se apagan enseguida */
+.disc.is-leaving .disc__burst { opacity: 0; }
 .disc__face {
   position: absolute; inset: 0; border-radius: 50%;
   background:
@@ -361,8 +364,16 @@ body.entered .hero.can-pan .hero__pan-hint { display: block; }
 .player__tt small { color: var(--lilac); font-size: .78rem; }
 .player:not(.is-on) small::after { content: " · en pausa"; }
 
-.footer { position: relative; overflow: hidden; text-align: center; padding: 4rem 16px 7rem; color: var(--lilac); font-size: .92rem; background: linear-gradient(transparent, var(--plum) 40%); }
-.footer__sign { position: relative; width: min(620px, 92%); margin: 0 auto 1.6rem; }
+/* escena final: ocupa justo una pantalla para que el rótulo quede en el centro,
+   que es también el centro del túnel; los enlaces van abajo */
+.footer {
+  position: relative; overflow: hidden; text-align: center; color: var(--lilac); font-size: .92rem;
+  height: 100vh; height: 100lvh; min-height: 420px; padding: 70px 16px;
+  display: grid; place-items: center;
+  background: radial-gradient(circle, transparent 35%, rgba(27, 11, 46, .55) 80%);
+}
+.footer__sign { position: relative; width: min(620px, 88vw, 110vh); will-change: transform, opacity; }
+.footer__meta { position: absolute; left: 0; right: 0; bottom: calc(1.2rem + env(safe-area-inset-bottom, 0px)); padding: 0 calc(16px + 4.5rem); }
 /* rayos de colores girando detrás del rótulo, como el mandala de la portada */
 .footer__sign::before {
   content: ""; position: absolute; left: 50%; top: 50%; width: 170%; aspect-ratio: 1; transform: translate(-50%, -50%);

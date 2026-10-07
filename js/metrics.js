@@ -27,6 +27,23 @@
       KF.listeners.forEach((fn) => fn(KF));
     }
   };
+  /* Medidor de fluidez: cada segundo devuelve qué parte de los fotogramas fue
+     lenta, comparando con el ritmo real de la pantalla (60, 90, 120 Hz… o 30 en
+     un móvil en ahorro de energía, que no debe contar como «lento»). */
+  KF.meter = function () {
+    let win = 0, raws = [];
+    return function (raw) {
+      if (!(raw > 0) || raw >= 1) return null;      // parones de pestaña o carga: no cuentan
+      win += raw; raws.push(raw);
+      if (win < 1) return null;
+      const sorted = raws.slice().sort((a, b) => a - b);
+      const beat = sorted[Math.floor(sorted.length * 0.1)];
+      const limit = Math.max(beat * 1.5, 0.021);
+      const share = raws.filter((r) => r > limit).length / raws.length;
+      win = 0; raws = [];
+      return share;
+    };
+  };
   window.KF = KF;
   let queued = false;
   const later = () => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; KF.measure(); }); };

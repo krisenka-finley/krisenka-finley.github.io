@@ -147,8 +147,11 @@
 
   // posición de cada sección, guardada (leerla en cada fotograma frena la página)
   let secBox = [];
+  const footer = $(".footer");
+  const finale = { sign: $(".footer__sign"), top: 0 };
   KF.onMeasure(() => {
     secBox = nights.map((sec) => ({ sec, top: sec.offsetTop, h: sec.offsetHeight, disc: $(".disc", sec), music: $(".music", sec), shown: null }));
+    finale.top = footer.offsetTop;
     vinylHome = null;
   });
   KF.measure();
@@ -160,8 +163,10 @@
       return { s: Math.pow(0.02, u), rot: u * u * 900, o: 1 - sm(0.8, 1, u), hold: false };
     }
     if (k > outStart) {
+      // sale hacia la cámara girando y se desvanece pronto: si crece mucho,
+      // tapa varias veces la pantalla y el navegador se atasca al dibujarlo
       const v = Math.min(1, (k - outStart) / (1 - outStart));
-      return { s: 1.04 + v * 2.6, rot: -v * v * 600, o: 1 - sm(0, 0.85, v), hold: false };
+      return { s: 1.04 + v * 0.9, rot: -v * v * 360, o: 1 - sm(0, 0.6, v), hold: false, leaving: true };
     }
     return { s: 1 + (k - inEnd) * 0.1, rot: 0, o: 1, hold: true };
   }
@@ -175,6 +180,9 @@
   function apply(el, f, spin, dy) {
     el.style.transform = `translateY(${(dy || 0).toFixed(1)}px) ${spin ? `rotate(${f.rot.toFixed(1)}deg) ` : ""}scale(${f.s.toFixed(4)})`;
     el.style.opacity = f.o.toFixed(3);
+    // ya invisible: que no se dibuje; y al salir, los rayos de detrás se apagan
+    el.style.visibility = f.o < 0.005 ? "hidden" : "";
+    el.classList.toggle("is-leaving", !!f.leaving);
   }
   function show(box, on) {
     if (box.shown === on) return;
@@ -208,7 +216,7 @@
         // primero llegan el título y el reproductor; con la sección ya fija,
         // los vinilos salen uno tras otro del centro del túnel, girando
         const f = flight(Math.min(k, 0.99), 0.0, 0.88);
-        apply(box.music, f, false, centreShift(box, y, vh));
+        apply(box.music, f, true, centreShift(box, y, vh));
         if (!vinylHome || !vinylHome.length) measureVinyls();
         const n = vinylHome.length;
         const step = Math.min(0.1, 0.5 / Math.max(1, n));
@@ -228,6 +236,13 @@
         if (f.hold) holding = true;
       }
     });
+    // escena final: el rótulo sale del fondo del túnel girando y se queda en el
+    // centro de la pantalla (el pie ocupa justo una pantalla al final de la página)
+    const q = (y - (finale.top - vh)) / vh;
+    if (q > -0.05) {
+      const f = flight((Math.min(q, 1) - 1) * 0.57, 0, 2);   // llega durante el último 70 % de la bajada
+      apply(finale.sign, f, true, -(1 - Math.min(1, q)) * vh);
+    }
   }
   window.KFTravel = () => travel();
 

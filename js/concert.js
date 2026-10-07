@@ -132,7 +132,8 @@
   const clock = new THREE.Clock();
   const Z0 = 8, ZL = 120;
 
-  let last = performance.now(), frames = 0, slow = 0, win = 0, lastFade = "";
+  let last = performance.now(), lastFade = "";
+  const meter = KF.meter();
   function frame(now) {
     requestAnimationFrame(frame);
     const raw = (now - last) / 1000;
@@ -143,15 +144,10 @@
     if (fo !== lastFade) { lastFade = fo; canvas.style.opacity = fo; }
     visible = fade > 0.01;
     if (!visible || document.hidden) return;
-    // calidad adaptable, igual que en la portada: se mira cada segundo
-    if (raw < 1) {
-      win += raw; frames++;
-      if (raw > 0.021) slow++;
-      if (win >= 1) {
-        if (slow * 3 > frames && quality > 0.45) { quality *= 0.75; R.setPixelRatio(quality); resize(); }
-        win = 0; frames = 0; slow = 0;
-      }
-    }
+    // calidad adaptable, igual que en la portada: se mira cada segundo, y solo
+    // con el túnel a solas (mientras se ve la portada, la lentitud es de las dos)
+    const slowShare = fade >= 1 ? meter(raw) : null;
+    if (slowShare > 1 / 3 && quality > 0.45) { quality *= 0.8; R.setPixelRatio(quality); resize(); }
 
     const t = reduce ? 0 : clock.getElapsedTime();
     const max = Math.max(1, KF.docH - vh - heroH * 0.5);
@@ -162,10 +158,12 @@
     const bass = 0.22 + 0.14 * Math.sin(t * 1.4) + 0.06 * Math.sin(t * 3.1), hit = 0, bands = beat.bands;
 
     const cz = Z0 - p * ZL + (1 - fade) * 10;
-    const sk = 0;
-    cam.position.set(Math.sin(p * 18) * 0.45 + smx * 1.4 + (Math.random() - 0.5) * sk, Math.sin(p * 12) * 0.3 - smy * 0.7 + (Math.random() - 0.5) * sk, cz);
-    cam.rotation.z = Math.sin(p * 9) * 0.04 - smx * 0.03;
-    cam.lookAt(smx * 1.2, -smy * 0.5, cz - 10);
+    // al llegar al final la cámara se endereza: el centro del túnel queda en el
+    // centro de la pantalla, justo detrás del rótulo
+    const st = 1 - sm(0.9, 1, p);
+    cam.position.set((Math.sin(p * 18) * 0.45 + smx * 1.4) * st, (Math.sin(p * 12) * 0.3 - smy * 0.7) * st, cz);
+    cam.rotation.z = (Math.sin(p * 9) * 0.04 - smx * 0.03) * st;
+    cam.lookAt(smx * 1.2 * st, -smy * 0.5 * st, cz - 10);
     cam.fov = (mobile ? 70 : 55) + bass * 4 + hit * 7;
     cam.updateProjectionMatrix();
 
