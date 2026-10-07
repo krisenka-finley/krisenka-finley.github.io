@@ -106,13 +106,38 @@ main, .footer { position: relative; z-index: 1; }
 .stage__fx { opacity: 0; transition: opacity .6s; }
 .stage.gl-ready .stage__fx { opacity: 1; }
 .stage__fx2d { pointer-events: none; }
-.stage__fish { left: 49.4%; top: 72.94%; width: 15.1%; pointer-events: none; }
+.stage__fish { left: 49.75%; top: 71.24%; width: 14.6%; pointer-events: none; }
 .stage.fish-live .stage__fish { display: none; }
 
 .drift { inset: 0; pointer-events: none; overflow: hidden; }
 .drift__track { position: absolute; left: 0; top: var(--top); width: 100%; animation: drift var(--dur) linear infinite; animation-delay: var(--delay); }
 .drift__track--rev { animation-direction: reverse; }
 .drift__track svg { width: var(--w); display: block; opacity: .82; filter: drop-shadow(0 4px 0 rgba(58, 29, 92, .25)); animation: bob 6s ease-in-out infinite; }
+
+/* capas de la portada: cantante, nombre y ramos, colocados con data-rect como las zonas interactivas */
+.layers { inset: 0; pointer-events: none; }
+.layer { position: absolute; left: calc(var(--x) * 100%); top: calc(var(--y) * 100%); width: calc(var(--w) * 100%); height: calc(var(--h) * 100%); max-width: none; }
+/* las flores se mecen desde el tallo; con las ráfagas de viento se inclinan hacia la derecha */
+.layer--flor { transform-origin: 50% 100%; animation: sway var(--dur) ease-in-out var(--d) infinite alternate; transition: rotate 1.4s cubic-bezier(.3, 1.4, .5, 1); }
+.stage.is-gust .layer--flor { rotate: 3deg; }
+/* el nombre respira y, al pasar por encima, se aviva */
+.layer--nombre { transform-origin: 50% 60%; animation: breathe-soft 7s ease-in-out infinite; transition: scale .45s cubic-bezier(.3, 1.6, .5, 1), filter .45s; }
+.stage.title-hover .layer--nombre { scale: 1.04; filter: saturate(1.25) brightness(1.06); }
+/* la cantante se balancea al cantar y da un saltito al rasguear */
+.layer--cantante { transform-origin: 30% 100%; animation: sing 4.2s ease-in-out infinite; transition: translate .3s cubic-bezier(.3, 1.6, .5, 1); }
+.layer--cantante.strum { translate: 0 -1.2%; }
+/* equipo justo: las capas se quedan quietas (lo decide hero.js midiendo la fluidez) */
+.stage.is-lite .layer, .stage.is-lite ~ .hero__nombre { animation-play-state: paused; }
+.hero__nombre { display: none; }
+@media (max-aspect-ratio: 1/1) {
+  .layer--nombre { visibility: hidden; }
+  .hero__nombre {
+    display: block; position: absolute; left: 50%; top: calc(64px + env(safe-area-inset-top, 0px)); z-index: 3;
+    width: min(92vw, 560px); height: auto; translate: -50% 0; cursor: pointer;
+    transform-origin: 50% 60%; animation: breathe-soft 7s ease-in-out infinite;
+  }
+  .hero__pan-hint { top: auto; bottom: calc(6.6rem + env(safe-area-inset-bottom, 0px)); }
+}
 
 /* el menú de nubes aparece al entrar */
 .cloud-menu { inset: 0; pointer-events: none; }
@@ -396,6 +421,9 @@ body.entered .hero.can-pan .hero__pan-hint { display: block; }
 @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5%) rotate(-1deg); } }
 @keyframes wobble { 0%, 100% { transform: scale(1.06) rotate(-3deg); } 50% { transform: scale(1.1) rotate(3deg) translateY(-3%); } }
 @keyframes ring { from { transform: scale(.6); opacity: 1; } to { transform: scale(1.5); opacity: 0; } }
+@keyframes sway { from { transform: rotate(-1.4deg); } to { transform: rotate(1.4deg); } }
+@keyframes breathe-soft { 50% { transform: translateY(-.6%) scale(1.012); } }
+@keyframes sing { 0%, 100% { transform: none; } 50% { transform: rotate(.8deg) translateY(-.3%); } }
 @keyframes drip { 0%, 100% { transform: translateY(-2px); } 50% { transform: translateY(3px); } }
 
 /* ---------- Responsive ---------- */
