@@ -37,6 +37,9 @@
     stage.style.height = h + "px";
     state.scale = w / IW;
     state.maxPan = Math.max(0, (w - vw) / 2);
+    // en pantallas verticales, la vista de partida es la cantante (justo debajo del nombre)
+    state.home = vw < vh ? Math.min(state.maxPan, (1000 - 470) * state.scale) : 0;
+    if (!state.userPanned) state.pan = state.home;
     state.offY = (vh - h) * 0.35;
     hero.classList.toggle("can-pan", state.maxPan > 40);
     applyPan();
@@ -656,6 +659,7 @@
     if (Math.abs(dx) > 8) drag.moved = true;
     if (drag.moved) {
       state.pan = drag.pan + dx;
+      state.userPanned = true;
       applyPan();
       panHint.classList.add("is-hidden");
     }
@@ -670,12 +674,14 @@
 
   function tourPan() {
     if (fish.phase === "hold") fish.timer = 2.4;   // el salto empieza al entrar
-    // en móvil: paseo inicial por la ilustración (cantante → centro)
+    // en móvil: paseo por la ilustración (cantante → río y siluro → cantante)
     if (state.maxPan < 40 || reduceMotion) return;
-    const start = performance.now();
+    const start = performance.now(), from = state.pan;
+    const river = Math.max(-state.maxPan, (1000 - 1150) * state.scale);
     const step = (now) => {
-      const k = Math.min(1, (now - start) / 5200);
-      state.pan = state.maxPan * 0.85 * Math.sin(Math.PI * k);
+      const k = Math.min(1, (now - start) / 3600);
+      const e = Math.sin(Math.PI * k);
+      state.pan = (k < 0.5 ? from : state.home) + (river - (k < 0.5 ? from : state.home)) * e;
       applyPan();
       if (k < 1 && !drag) requestAnimationFrame(step);
     };
