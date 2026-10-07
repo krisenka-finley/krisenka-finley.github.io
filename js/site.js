@@ -1,0 +1,309 @@
+/* ==========================================================
+   Entrada, reproductor, navegación, discos y recorrido automático
+   ========================================================== */
+(function () {
+  "use strict";
+
+  const D = window.KF_DATA;
+  const B = window.KFBeat;
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+  /* ---------- Entrada ---------- */
+  const gate = $("#gate");
+  const player = $("#player");
+
+  function enter(withSound) {
+    gate.classList.add("is-out");
+    document.body.classList.remove("lock");
+    document.body.classList.add("entered");   // aparecen el menú de nubes y las zonas interactivas
+    player.hidden = false;
+    window.KFAudio.setEnabled(withSound);
+    if (withSound) B.play();
+    setTimeout(() => window.KFHero && KFHero.tourPan(), 700);
+  }
+  $$("[data-enter]", gate).forEach((b) => b.addEventListener("click", () => enter(b.dataset.enter === "sound")));
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  window.scrollTo(0, 0);
+  $("[data-enter='sound']", gate).focus();
+
+  /* ---------- Reproductor (flotante y del apartado Música) ---------- */
+  const ring = $("#ring");
+  const deckPlay = $("#deck-play");
+  const seek = $("#deck-seek");
+  const time = $("#deck-time");
+  let seeking = false;
+
+  function toggle() {
+    if (!window.KFAudio.enabled) window.KFAudio.setEnabled(true);
+    B.toggle();
+  }
+  player.addEventListener("click", toggle);
+  deckPlay.addEventListener("click", toggle);
+  document.addEventListener("kf:play", toggle);
+
+  B.onChange(() => {
+    const on = B.playing;
+    player.classList.toggle("is-on", on);
+    deckPlay.textContent = on ? "❚❚" : "▶";
+    deckPlay.setAttribute("aria-label", on ? "Pausar Back Again" : "Reproducir Back Again");
+    $(".deck").classList.toggle("is-on", on);
+  });
+
+  seek.addEventListener("input", () => { seeking = true; B.seek(seek.value / 1000); });
+  seek.addEventListener("change", () => { seeking = false; });
+
+  const viz = $("#deck-viz");
+  function drawViz() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = viz.clientWidth, h = viz.clientHeight;
+    if (!w) return;
+    if (viz.width !== Math.round(w * dpr)) { viz.width = Math.round(w * dpr); viz.height = Math.round(h * dpr); }
+    const c = viz.getContext("2d");
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, w, h);
+    const n = B.bands.length, bw = w / n;
+    for (let i = 0; i < n; i++) {
+      const v = Math.max(0.04, B.bands[i]);
+      const bh = v * h * 0.95;
+      c.fillStyle = `hsl(${330 + i * 9}, 95%, ${58 + v * 15}%)`;
+      c.fillRect(i * bw + 1.5, (h - bh) / 2, bw - 3, bh);
+    }
+  }
+
+  function uiLoop() {
+    const a = B.audio;
+    if (a.duration) {
+      ring.style.strokeDashoffset = (150.8 * (1 - a.currentTime / a.duration)).toFixed(1);
+      if (!seeking) seek.value = Math.round((a.currentTime / a.duration) * 1000);
+      time.textContent = `${fmt(a.currentTime)} / ${fmt(a.duration)}`;
+    }
+    drawViz();
+    requestAnimationFrame(uiLoop);
+  }
+  requestAnimationFrame(uiLoop);
+
+  /* ---------- Barra superior ---------- */
+  const topbar = $("#topbar");
+  const hero = $("#inicio");
+  const onScroll = () => topbar.classList.toggle("is-on", window.scrollY > hero.offsetHeight * 0.6);
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  const navLinks = $$(".topbar__nav a");
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach((en) => {
+      if (!en.isIntersecting) return;
+      const id = en.target.id === "trayectoria" ? "bio" : en.target.id;
+      navLinks.forEach((a) => a.classList.toggle("is-active", a.getAttribute("href") === "#" + id));
+    });
+  }, { rootMargin: "-45% 0px -50% 0px" });
+  $$("main section[id]").forEach((s) => spy.observe(s));
+
+  /* ---------- Discos: borde con texto que gira y rayos detrás ---------- */
+  $$(".disc").forEach((d, i) => {
+    d.setAttribute("data-beat", "");
+    const rim = document.createElement("div");
+    rim.className = "disc__rim";
+    rim.setAttribute("aria-hidden", "true");
+    rim.innerHTML = `<svg viewBox="0 0 100 100"><path id="rim${i}" d="M4.5,50 a45.5,45.5 0 1,1 91,0 a45.5,45.5 0 1,1 -91,0" fill="none"/><text><textPath href="#rim${i}" textLength="283" lengthAdjust="spacing">${esc(d.dataset.rim)}</textPath></text></svg>`;
+    d.prepend(rim);
+    const face = document.createElement("i");
+    face.className = "disc__face";
+    d.prepend(face);
+    const burst = document.createElement("i");
+    burst.className = "disc__burst";
+    d.prepend(burst);
+  });
+
+  /* ---------- Viaje por el túnel: cada sección se queda fija mientras su
+     disco sale del fondo girando, se para para leerlo y sale volando ---------- */
+  const sm = (a, b, x) => { x = Math.min(1, Math.max(0, (x - a) / (b - a))); return x * x * (3 - 2 * x); };
+  const nights = $$(".night");
+  let holding = false;
+  let vinylHome = null;           // posición de cada vinilo respecto al centro de la pantalla
+
+  function progress(sec) {
+    const r = sec.getBoundingClientRect();
+    return -r.top / Math.max(1, r.height - window.innerHeight);
+  }
+  // k < 0: llega; 0..1: fijada en pantalla
+  function flight(k, inEnd, outStart) {
+    if (k < inEnd) {
+      const u = Math.min(1, (inEnd - k) / (inEnd + 0.45));
+      return { s: Math.pow(0.04, u), rot: u * u * 900, o: 1 - sm(0.55, 1, u), hold: false };
+    }
+    if (k > outStart) {
+      const v = Math.min(1, (k - outStart) / (1 - outStart));
+      return { s: 1.04 + v * 2.6, rot: -v * v * 600, o: 1 - sm(0, 0.85, v), hold: false };
+    }
+    return { s: 1 + (k - inEnd) * 0.1, rot: 0, o: 1, hold: true };
+  }
+  function apply(el, f, spin) {
+    el.style.transform = `${spin ? `rotate(${f.rot.toFixed(1)}deg) ` : ""}scale(${f.s.toFixed(4)})`;
+    el.style.opacity = f.o.toFixed(3);
+    el.style.visibility = f.o < 0.02 ? "hidden" : "visible";
+    const blur = spin ? Math.abs(f.rot) / 900 * 7 : 0;
+    el.style.filter = blur > 0.4 ? `blur(${blur.toFixed(1)}px)` : "";
+  }
+
+  function measureVinyls() {
+    const items = $$(".vinyls li");
+    items.forEach((li) => (li.style.transform = ""));
+    const pin = $("#musica .pin").getBoundingClientRect();
+    vinylHome = items.map((li) => {
+      const r = li.getBoundingClientRect();
+      return { li, x: r.left + r.width / 2 - (pin.left + pin.width / 2), y: r.top + r.width / 2 - (pin.top + pin.height / 2) };
+    });
+  }
+
+  function travel() {
+    holding = false;
+    nights.forEach((sec) => {
+      const k = progress(sec);
+      if (k < -0.9 || k > 1.1) { sec.style.visibility = "hidden"; return; }
+      sec.style.visibility = "";
+      if (sec.id === "musica") {
+        const f = flight(Math.min(k, 0.99), 0.05, 0.86);
+        const music = $(".music", sec);
+        // la cabecera y el reproductor llegan sin girar; los vinilos salen del centro uno a uno
+        const head = k < 0.05 ? { s: 0.6 + 0.4 * sm(-0.45, 0.05, k), o: sm(-0.45, 0.05, k), rot: 0 } : f;
+        apply(music, head, false);
+        if (!vinylHome || !vinylHome.length) measureVinyls();
+        vinylHome.forEach((v, j) => {
+          const e = sm(-0.25 + j * 0.08, 0.2 + j * 0.08, k);
+          v.li.style.transform = `translate(${(-v.x * (1 - e)).toFixed(1)}px, ${(-v.y * (1 - e)).toFixed(1)}px) rotate(${((1 - e) * 720).toFixed(0)}deg) scale(${(0.06 + 0.94 * e).toFixed(3)})`;
+          v.li.style.opacity = sm(0, 0.3, e).toFixed(3);
+        });
+        if (k > 0.45 && k < 0.86) holding = true;
+      } else {
+        const f = flight(k, 0.28, 0.72);
+        apply($(".disc", sec), f, true);
+        if (f.hold) holding = true;
+      }
+    });
+  }
+
+  if (!reduce) {
+    let queued = false;
+    const kick = () => { if (queued) return; queued = true; requestAnimationFrame(() => { queued = false; travel(); }); };
+    window.addEventListener("scroll", kick, { passive: true });
+    window.addEventListener("resize", () => { vinylHome = null; kick(); });
+    setTimeout(travel, 0);
+  }
+
+  // los enlaces internos llevan al momento en que el disco está quieto y legible
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a) return;
+    const id = a.getAttribute("href").slice(1);
+    const sec = document.getElementById(id);
+    if (!sec) return;
+    e.preventDefault();
+    const vh = window.innerHeight;
+    let top = sec.offsetTop;
+    if (sec.classList.contains("night")) top += (sec.offsetHeight - vh) * (sec.id === "musica" ? 0.6 : 0.48);
+    window.scrollTo({ top, behavior: reduce ? "auto" : "smooth" });
+  });
+
+  /* ---------- Vinilos y caja de CD ---------- */
+  $("#vinyls").innerHTML = D.albums.map((a, j) => `
+    <li><button class="vinyl" type="button" data-beat data-album="${j}" style="--d:${(j * -1.3).toFixed(1)}s" aria-label="Abrir ${esc(a.title)}">
+      <span class="vinyl__disc"><span class="vinyl__label" style="background-image:url('${esc(a.cover)}')"></span></span>
+      <span class="vinyl__sheen" aria-hidden="true"></span>
+    </button><span class="vinyl__name">${esc(a.title)}</span><span class="vinyl__kind">${esc(a.kind)}</span></li>`).join("");
+
+  const dlg = $("#case");
+  const box = $("#case-box");
+  let openTimer = null;
+  function openCase(j, from) {
+    const a = D.albums[j];
+    $("#case-cover").src = a.cover;
+    $("#case-cover").alt = `Portada de «${a.title}»`;
+    $("#case-cd").style.setProperty("--cover", `url("${new URL(a.cover, location.href).href}")`);
+    $("#case-booklet").textContent = `Krisenka Finley · ${a.title}`;
+    $("#case-kind").textContent = a.kind;
+    $("#case-title").textContent = a.title;
+    $("#case-note").textContent = a.note || "";
+    $("#case-note").hidden = !a.note;
+    $("#case-link").href = a.url;
+    $("#case-link").textContent = a.url.includes("bandcamp") ? "Escuchar en Bandcamp" : "Escuchar";
+    // la caja sale desde el vinilo pulsado
+    const r = from.getBoundingClientRect();
+    box.style.setProperty("--fx", `${r.left + r.width / 2 - window.innerWidth / 2}px`);
+    box.style.setProperty("--fy", `${r.top + r.height / 2 - window.innerHeight / 2}px`);
+    box.classList.remove("is-open", "is-in");
+    if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+    requestAnimationFrame(() => requestAnimationFrame(() => box.classList.add("is-in")));
+    clearTimeout(openTimer);
+    openTimer = setTimeout(() => box.classList.add("is-open"), reduce ? 0 : 650);
+    window.KFAudio.bloop();
+  }
+  function closeCase() {
+    box.classList.remove("is-open");
+    setTimeout(() => { box.classList.remove("is-in"); if (dlg.open) dlg.close(); }, reduce ? 0 : 420);
+  }
+  $("#vinyls").addEventListener("click", (e) => {
+    const v = e.target.closest(".vinyl");
+    if (v) openCase(Number(v.dataset.album), v);
+  });
+  $("#case-close").addEventListener("click", closeCase);
+  dlg.addEventListener("click", (e) => { if (e.target === dlg) closeCase(); });
+  dlg.addEventListener("cancel", (e) => { e.preventDefault(); closeCase(); });
+  box.addEventListener("click", () => box.classList.toggle("is-open"));
+
+  /* ---------- Conciertos ---------- */
+  const now = new Date();
+  const gigs = D.gigs.map((g) => ({ ...g, when: new Date(g.date) })).filter((g) => g.when >= now).sort((a, b) => a.when - b.when);
+  const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  $("#gigs").innerHTML = gigs.length
+    ? `<h2>En<br><em>directo.</em></h2><ul class="facts">${gigs.slice(0, 4).map((g) => `
+        <li><b>${g.when.getDate()} ${MONTHS[g.when.getMonth()]} · ${esc(g.city)}</b><i>${esc(g.venue)}${g.url ? ` · <a href="${esc(g.url)}" target="_blank" rel="noopener">Entradas</a>` : ""}</i></li>`).join("")}</ul>`
+    : `<div class="soon"><i aria-hidden="true"></i>Cocinando un disco nuevo</div>
+       <h2>Nuevas fechas,<br><em>muy pronto.</em></h2>
+       <p>Los próximos conciertos se anunciarán aquí. Mientras tanto, sus directos están en YouTube.</p>
+       <a class="btn" href="https://www.youtube.com/krisenka" target="_blank" rel="noopener">Ver directos</a>`;
+
+  /* ---------- Enlaces ---------- */
+  $("#links").innerHTML = D.links.map((l) => `<li><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.name)}</a><i>${esc(l.note)}</i></li>`).join("");
+
+  /* ---------- Recorrido automático (baja solo por la página) ---------- */
+  const autoBtn = $("#auto");
+  const auto = { on: false, pos: 0, last: 0, wait: 0 };
+  function setAuto(on) {
+    auto.on = on;
+    auto.pos = window.scrollY;
+    auto.last = window.scrollY;
+    autoBtn.setAttribute("aria-pressed", String(on));
+    autoBtn.querySelector("span").textContent = on ? "Parar" : "Recorrido automático";
+    if (on && !B.playing && window.KFAudio.enabled) B.play();
+  }
+  autoBtn.addEventListener("click", () => setAuto(!auto.on));
+  ["wheel", "touchstart", "keydown"].forEach((ev) => window.addEventListener(ev, (e) => {
+    if (auto.on && !(e.target.closest && e.target.closest("#auto"))) setAuto(false);
+  }, { passive: true }));
+  let lt = performance.now();
+  function autoLoop(now) {
+    const dt = Math.min(0.05, (now - lt) / 1000);
+    lt = now;
+    if (auto.on) {
+      const vh = window.innerHeight, max = document.documentElement.scrollHeight - vh;
+      if (Math.abs(window.scrollY - auto.last) > 3) setAuto(false);
+      else {
+        if (auto.wait > 0) auto.wait -= dt;
+        else {
+          // más despacio mientras un disco está quieto, para poder leerlo
+          auto.pos += (vh / (holding ? 9 : 3.2)) * dt;
+          if (auto.pos >= max) { auto.pos = 0; auto.wait = 3; }
+        }
+        window.scrollTo(0, auto.pos);
+        auto.last = window.scrollY;
+      }
+    }
+    requestAnimationFrame(autoLoop);
+  }
+  requestAnimationFrame(autoLoop);
+})();
