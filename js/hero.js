@@ -20,7 +20,7 @@
 
   const state = {
     t: 0, last: performance.now(), running: true, visible: true,
-    mouse: [-9999, -9999], night: 0, quality: 1, slow: 0, frames: 0, wind: 0, windTarget: 0, titleBoost: 0, titleHover: false,
+    mouse: [-9999, -9999], night: 0, quality: 1, slow: 0, frames: 0, win: 0, dim: false, wind: 0, windTarget: 0, titleBoost: 0, titleHover: false,
     sunAngle: 0, sunVel: 0, ripples: [], pan: 0, maxPan: 0, scale: 1
   };
 
@@ -241,7 +241,8 @@
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     // resolución WebGL limitada para que vaya fluido en cualquier equipo
     const budget = window.innerWidth < 700 ? 0.55e6 : 1.1e6;
-    const glScale = Math.min(dpr, 1.25, Math.sqrt(budget / (w * h))) * state.quality;
+    // al anochecer el túnel 3D ya se ve detrás: la portada, oscurecida, va a media resolución
+    const glScale = Math.min(dpr, 1.25, Math.sqrt(budget / (w * h))) * state.quality * (state.dim ? 0.5 : 1);
     glCanvas.width = Math.round(w * glScale);
     glCanvas.height = Math.round(h * glScale);
     if (gl) gl.viewport(0, 0, glCanvas.width, glCanvas.height);
@@ -536,20 +537,12 @@
     const dt = Math.min(0.05, raw);
     state.last = now;
     if (state.running && state.visible) {
-      // calidad adaptable: si el equipo no llega a ~40 fps, se baja la resolución
-      state.frames++;
-      if (raw > 0.021) state.slow++;
-      if (state.frames >= 60) {
-        if (state.slow > 20 && state.quality > 0.45) {
-          state.quality *= 0.75;
-          resizeCanvases(parseFloat(stage.style.width), parseFloat(stage.style.height));
-        }
-        state.frames = 0; state.slow = 0;
-      }
       state.t += dt;
       state.wind += (state.windTarget - state.wind) * Math.min(1, dt * 1.6);
       const night = Math.min(1, Math.max(0, KF.y() / Math.max(1, KF.heroH) * 1.4));
       if (night !== state.night) { state.night = night; dusk.style.opacity = night.toFixed(3); }
+      const dim = state.dim ? night > 0.36 : night > 0.42;
+      if (dim !== state.dim) { state.dim = dim; resizeCanvases(parseFloat(stage.style.width), parseFloat(stage.style.height)); }
       state.titleBoost += ((state.titleHover ? 1 : 0) - state.titleBoost) * Math.min(1, dt * 3);
       state.sunVel *= Math.pow(0.35, dt);
       state.sunAngle += state.sunVel * dt;
@@ -560,6 +553,20 @@
       // cuando ya es de noche (la portada está casi tapada) no se dibuja: así
       // la portada y el túnel 3D no compiten por la tarjeta gráfica
       if (state.night < 0.97) {
+        // calidad adaptable: se mira cada segundo (no cada 60 fotogramas, que en
+        // un equipo lento tardaría mucho); si un tercio de los fotogramas pasa de
+        // ~40 fps, se baja la resolución (un parón suelto no basta).
+        if (raw < 1) {
+          state.win += raw; state.frames++;
+          if (raw > 0.021) state.slow++;
+          if (state.win >= 1) {
+            if (state.slow * 3 > state.frames && state.quality > 0.45) {
+              state.quality *= 0.75;
+              resizeCanvases(parseFloat(stage.style.width), parseFloat(stage.style.height));
+            }
+            state.win = 0; state.frames = 0; state.slow = 0;
+          }
+        }
         drawGL();
         update2D(dt);
         draw2D();

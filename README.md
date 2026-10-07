@@ -10,7 +10,7 @@ Web de una sola página: **de día** se pasea por la ilustración animada de Zar
 - **Música**: reproductor de «Back Again» con ecualizador real, vinilos que giran y, al pulsar uno, su **caja de CD se abre** y muestra el disco.
 - **Recorrido automático**: empieza solo al entrar y se para en cuanto el visitante toca la rueda, la pantalla o el teclado.
 - **Reproductor flotante** con el progreso de la canción.
-- **Ligera**: la canción y el 3D solo se descargan cuando hacen falta, las imágenes van en WebP y, si el equipo va justo, la portada y el túnel bajan su resolución solos. Solo el ecualizador sigue a la música; el resto de animaciones van solas.
+- **Ligera**: la canción solo se descarga al escucharla y el 3D se descarga y se prepara durante la entrada (así no da tirones al aparecer), las imágenes van en WebP y, si el equipo va justo, la portada y el túnel bajan su resolución solos. Solo el ecualizador sigue a la música; el resto de animaciones van solas.
 - Con «reducir movimiento» activado, todo se muestra estático.
 
 ## Editar contenido
