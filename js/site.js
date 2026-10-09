@@ -109,7 +109,11 @@
   /* ---------- Barra superior ---------- */
   const topbar = $("#topbar");
   const hero = $("#inicio");
-  const onScroll = () => topbar.classList.toggle("is-on", window.scrollY > KF.heroH * 0.6);
+  const onScroll = () => {
+    const past = window.scrollY > KF.heroH * 0.6;
+    topbar.classList.toggle("is-on", past);
+    document.body.classList.toggle("in-hero", !past);   // en la portada, el reproductor flotante va en pequeño
+  };
   window.addEventListener("scroll", onScroll, { passive: true });
   onScroll();
 
@@ -156,7 +160,7 @@
   });
   KF.measure();
   // k < 0: llega; 0..1: fijada en pantalla
-  function flight(k, inEnd, outStart) {
+  function flight(k, inEnd, outStart, zoom = 0.1) {
     if (k < inEnd) {
       // llega desde el fondo: diminuto, lejos y girando
       const u = Math.min(1, (inEnd - k) / (inEnd + 0.4));
@@ -168,7 +172,7 @@
       const v = Math.min(1, (k - outStart) / (1 - outStart));
       return { s: 1.04 + v * 0.9, rot: -v * v * 360, o: 1 - sm(0, 0.6, v), hold: false, leaving: true };
     }
-    return { s: 1 + (k - inEnd) * 0.1, rot: 0, o: 1, hold: true };
+    return { s: 1 + (k - inEnd) * zoom, rot: 0, o: 1, hold: true };   // acercamiento lento mientras se lee
   }
   // mientras la sección aún no está fija (o ya se suelta), se compensa su
   // desplazamiento para que todo nazca y se vaya justo en el centro de la pantalla
@@ -215,7 +219,7 @@
       if (box.music) {
         // primero llegan el título y el reproductor; con la sección ya fija,
         // los vinilos salen uno tras otro del centro del túnel, girando
-        const f = flight(Math.min(k, 0.99), 0.0, 0.88);
+        const f = flight(Math.min(k, 0.99), 0.0, 0.88, 0.02);   // la música ocupa todo el ancho: casi sin acercamiento
         apply(box.music, f, true, centreShift(box, y, vh));
         if (!vinylHome || !vinylHome.length) measureVinyls();
         const n = vinylHome.length;
@@ -253,6 +257,15 @@
     KF.onMeasure(kick);
     setTimeout(travel, 0);
   }
+
+  // al abrir un enlace externo (Bandcamp, Spotify, YouTube…) la música se para,
+  // para que no siga sonando debajo de la otra web
+  const external = (e) => {
+    const a = e.target.closest && e.target.closest("a[href]");
+    if (a && (a.target === "_blank" || a.origin !== location.origin) && B.playing) B.pause();
+  };
+  document.addEventListener("click", external);
+  document.addEventListener("auxclick", external);   // también con el botón central del ratón
 
   // los enlaces internos llevan al momento en que el disco está quieto y legible
   document.addEventListener("click", (e) => {
@@ -428,8 +441,8 @@
   }, { passive: true }));
   autoBtn.addEventListener("click", () => { userStopped = !auto.on; clearTimeout(idle); });
   // al entrar arranca el viaje enseguida
-  // (en vertical, después del paseo por la ilustración: cantante → río → cantante)
-  document.addEventListener("kf:entered", () => { if (!reduce) autoStart = setTimeout(() => setAuto(true), KF.vw < KF.vh ? 4600 : 1200); });
+  // (en vertical, con un momento más para ver la portada)
+  document.addEventListener("kf:entered", () => { if (!reduce) autoStart = setTimeout(() => setAuto(true), KF.vw < KF.vh ? 2600 : 1200); });
 
   const ease = (u) => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2);
   let lt = performance.now();

@@ -31,6 +31,9 @@ python3 -m http.server 8000
 # abrir http://localhost:8000
 ```
 
+## Al cambiar CSS o JavaScript
+En `index.html`, sube el número de `?v=` de `css/styles.css` y de los `js/…` (p. ej. de `?v=5` a `?v=6`). Así los navegadores descargan la versión nueva y no mezclan archivos viejos (GitHub Pages deja guardarlos 10 minutos).
+
 ## Imágenes de la portada
 Cada pieza es un archivo de `assets/` y su posición está en `index.html` (`data-rect="x,y,ancho,alto"`, en píxeles de la ilustración de 2000×1116):
 

@@ -17,6 +17,7 @@
   const panHint = document.getElementById("pan-hint");
   const dusk = document.getElementById("dusk");
   const cantante = document.getElementById("cantante");
+  const nombreMovil = document.getElementById("nombre-movil");
   const beat = window.KFBeat;
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const meter = KF.meter();
@@ -40,7 +41,8 @@
     // en pantallas verticales, la vista de partida es la cantante (justo debajo del nombre)
     state.home = vw < vh ? Math.min(state.maxPan, (1000 - 470) * state.scale) : 0;
     if (!state.userPanned) state.pan = state.home;
-    state.offY = (vh - h) * 0.35;
+    // si sobra ilustración en vertical, se recorta por abajo: arriba están las nubes del menú y el sol
+    state.offY = Math.max(vh - h, -8 * state.scale);
     hero.classList.toggle("can-pan", state.maxPan > 40);
     applyPan();
     resizeCanvases(w, h);
@@ -50,6 +52,9 @@
     state.pan = Math.max(-state.maxPan, Math.min(state.maxPan, state.pan));
     const x = (hero.clientWidth - parseFloat(stage.style.width)) / 2 + state.pan;
     stage.style.transform = `translate3d(${x}px, ${state.offY}px, 0)`;
+    // en vertical, al explorar lejos de la cantante el nombre se desvanece y deja ver la estatua
+    const away = Math.abs(state.pan - state.home) / Math.max(1, state.maxPan);
+    nombreMovil.style.opacity = (1 - Math.min(1, Math.max(0, (away - 0.1) / 0.4))).toFixed(2);
   }
 
   /* zonas interactivas posicionadas con data-rect="x,y,ancho,alto" */
@@ -674,18 +679,8 @@
 
   function tourPan() {
     if (fish.phase === "hold") fish.timer = 2.4;   // el salto empieza al entrar
-    // en móvil: paseo por la ilustración (cantante → río y siluro → cantante)
-    if (state.maxPan < 40 || reduceMotion) return;
-    const start = performance.now(), from = state.pan;
-    const river = Math.max(-state.maxPan, (1000 - 1150) * state.scale);
-    const step = (now) => {
-      const k = Math.min(1, (now - start) / 3600);
-      const e = Math.sin(Math.PI * k);
-      state.pan = (k < 0.5 ? from : state.home) + (river - (k < 0.5 ? from : state.home)) * e;
-      applyPan();
-      if (k < 1 && !drag) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
+    // en vertical la vista se queda en la cantante, bajo el nombre (si no, el nombre
+    // taparía la estatua); el resto se explora arrastrando
   }
 
   // pausa cuando la portada no se ve o la pestaña está oculta
